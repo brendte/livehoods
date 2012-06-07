@@ -40,6 +40,7 @@ public class Cluster {
 			return 0.0;
 		}
 	}
+	
 
 	/**
 	 * @param args
@@ -47,10 +48,13 @@ public class Cluster {
 	 */
 	@SuppressWarnings(value = "unchecked")
 	public static void main(String[] args) {
+		
 
 		DBCollection venue_coll, user_coll;
 		String affinityFilename = "affinity.ser";
+		String A_eigenFilename = "a_eigen.ser";
 		File f = null;
+		File g = null;
 		SparseDoubleMatrix2D A = null;
 		DoubleMatrix2D D = null;
 		EigenvalueDecomposition A_eigen = null;
@@ -58,9 +62,26 @@ public class Cluster {
 		DoubleMatrix2D L_norm = null;
 		FileInputStream fis = null;
 		ObjectInputStream in = null;
-
 		f = new File(affinityFilename);
-		if (f.exists()) {
+		g = new File(A_eigenFilename);
+		if (g.exists()) {
+			try {
+				fis = new FileInputStream(g);
+				in = new ObjectInputStream(fis);
+				A_eigen = (EigenvalueDecomposition) in.readObject();
+				in.close();
+				
+				System.out.println(A_eigen);
+				
+//				L = D - A;
+
+			} catch (IOException e) {
+				e.printStackTrace();
+			} catch (ClassNotFoundException e) {
+				e.printStackTrace();
+			}
+		}
+		else if (f.exists()) {
 			try {
 				fis = new FileInputStream(f);
 				in = new ObjectInputStream(fis);
@@ -69,9 +90,15 @@ public class Cluster {
 				
 				A_eigen = new EigenvalueDecomposition(A);
 				D = A_eigen.getD();
+				
+				FileOutputStream fos = null;
+				ObjectOutputStream out = null;
+				fos = new FileOutputStream(g);
+				out = new ObjectOutputStream(fos);
+				out.writeObject(A_eigen);
+				out.close();
+				
 				System.out.println(D);
-//				L = D - A;
-				System.out.println("Cardinality of A: " + A.cardinality());
 			} catch (IOException e) {
 				e.printStackTrace();
 			} catch (ClassNotFoundException e) {
