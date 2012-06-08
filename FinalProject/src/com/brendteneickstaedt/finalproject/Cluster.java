@@ -49,10 +49,16 @@ public class Cluster {
 	@SuppressWarnings(value = "unchecked")
 	public static void main(String[] args) {
 		
+		int m = 10;
+		double alpha = 0.01;
+		int k_min = 30;
+		int k_max = 45;
+		double tau = 0.4;
 
+	
 		DBCollection venue_coll, user_coll;
 		String affinityFilename = "affinity.ser";
-		String A_eigenFilename = "a_eigen.ser";
+		String Dfilename = "a_diagonal.ser";
 		File f = null;
 		File g = null;
 		SparseDoubleMatrix2D A = null;
@@ -63,48 +69,13 @@ public class Cluster {
 		FileInputStream fis = null;
 		ObjectInputStream in = null;
 		f = new File(affinityFilename);
-		g = new File(A_eigenFilename);
-		if (g.exists()) {
-			try {
-				fis = new FileInputStream(g);
-				in = new ObjectInputStream(fis);
-				A_eigen = (EigenvalueDecomposition) in.readObject();
-				in.close();
-				
-				System.out.println(A_eigen);
-				
-//				L = D - A;
-
-			} catch (IOException e) {
-				e.printStackTrace();
-			} catch (ClassNotFoundException e) {
-				e.printStackTrace();
-			}
-		}
-		else if (f.exists()) {
-			try {
-				fis = new FileInputStream(f);
-				in = new ObjectInputStream(fis);
-				A = (SparseDoubleMatrix2D) in.readObject();
-				in.close();
-				
-				A_eigen = new EigenvalueDecomposition(A);
-				D = A_eigen.getD();
-				
-				FileOutputStream fos = null;
-				ObjectOutputStream out = null;
-				fos = new FileOutputStream(g);
-				out = new ObjectOutputStream(fos);
-				out.writeObject(A_eigen);
-				out.close();
-				
-				System.out.println(D);
-			} catch (IOException e) {
-				e.printStackTrace();
-			} catch (ClassNotFoundException e) {
-				e.printStackTrace();
-			}
-		} else {
+		g = new File(Dfilename);
+		cern.jet.math.Functions F = cern.jet.math.Functions.functions;
+		Algebra alg = new Algebra();
+		
+		 if (!f.exists()) {
+			 // Create A
+			System.out.println("Creating A");
 			try {
 				// Load the collected and pre-processed venue and user data from
 				// MongoDB (see
@@ -157,11 +128,6 @@ public class Cluster {
 				}
 
 				// build affinity matrix A
-				int m = 10;
-				double alpha = 0.01;
-				int k_min = 30;
-				int k_max = 45;
-				double tau = 0.4;
 				A = new SparseDoubleMatrix2D(venueArraySize, venueArraySize);
 				for (int i = 1; i <= venueArraySize; i++) {
 					SparseDoubleMatrix1D c_i = venueCheckinVectors.get(i);
@@ -189,6 +155,62 @@ public class Cluster {
 			} catch (IOException e) {
 				e.printStackTrace();
 			} catch (MongoException e) {
+				e.printStackTrace();
+			}
+		} else if (!g.exists()) {
+			System.out.println("Creating D");
+			try {
+				fis = new FileInputStream(f);
+				in = new ObjectInputStream(fis);
+				A = (SparseDoubleMatrix2D) in.readObject();
+				in.close();
+				D = new SparseDoubleMatrix2D(A.rows(), A.columns());
+				for (int i = 0; i < A.viewRow(1).size() ; i++) {					
+					double degree = A.viewRow(i).zSum();
+					System.out.println("Row " + i + " degree: " + degree);
+					D.setQuick(i, i, degree);
+				}
+//				A_eigen = new EigenvalueDecomposition(A);
+//				D = A_eigen.getD();
+				
+				FileOutputStream fos = null;
+				ObjectOutputStream out = null;
+				fos = new FileOutputStream(g);
+				out = new ObjectOutputStream(fos);
+				out.writeObject(D);
+				out.close();
+				System.out.println("D cardinality: " + D.cardinality());
+			} catch (IOException e) {
+				e.printStackTrace();
+			} catch (ClassNotFoundException e) {
+				e.printStackTrace();
+			}
+		}  else  { //f and g exist
+			System.out.println("Normalizing");
+			try {
+				fis = new FileInputStream(f);
+				in = new ObjectInputStream(fis);
+				A = (SparseDoubleMatrix2D) in.readObject();
+				in.close();
+				fis = new FileInputStream(g);
+				in = new ObjectInputStream(fis);
+				D = (DoubleMatrix2D) in.readObject();
+				in.close();
+				
+				L = D.copy();
+				System.out.println("L cardinality: " + L.cardinality());
+				L.assign(A, F.minus);
+				System.out.println("L cardinality: " + L.cardinality());
+//				DoubleMatrix2D L_inv_sqrt = L.copy();
+				L.assign(F.sqrt).assign(F.inv); // L is now L^-1/2
+				L.zMult(D, L_norm);
+				L_norm.zMult(L, L_norm);
+				
+				System.out.println("L_norm cardinality: " + L_norm.cardinality());
+
+			} catch (IOException e) {
+				e.printStackTrace();
+			} catch (ClassNotFoundException e) {
 				e.printStackTrace();
 			}
 		}
