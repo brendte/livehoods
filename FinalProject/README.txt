@@ -43,8 +43,11 @@ Of note, I had to ensure that both i and j have at least 1 element > 0.0, otherw
 When this was completed, there were approximately 947,000 non-zero entries in the affinity matrix.
 
 **Spectral Clustering**
+NOTE: All spectral clustering calculations were run on a 4xExtraLarge AWS EC2 instance, with 68G of RAM, as the matrix calculations required more heap space than my 4G MacBook Air could provide.
 
 Using affinity matrix A, we calculate the diagonal degree matrix D of A, which is the sum of all affinity values j for row i. This is equivalent to calculating the "in weight" of all the edges into node i.  This value is stored at D(i, i), which is a sparse matrix containing only values on the diagonal. Once D is built, it is serialized and stored as a file. As one would expect, this calculation ran in only a few minutes.
+
+When this was completed, there were approximately 15,000 non-zero entries in D.
 
 With D built, we then calculate L = D - A, which is then used to calculate L_norm = D^-1/2*L*D^-1/2. Once L_norm is built, it is serialized and stored as a file.
 
