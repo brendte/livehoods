@@ -177,8 +177,6 @@ public class Cluster {
 					System.out.println("Row " + i + " degree: " + degree);
 					D.setQuick(i, i, degree);
 				}
-//				A_eigen = new EigenvalueDecomposition(A);
-//				D = A_eigen.getD();
 				
 				FileOutputStream fos = null;
 				ObjectOutputStream out = null;
@@ -201,17 +199,18 @@ public class Cluster {
 				in.close();
 				fis = new FileInputStream(g);
 				in = new ObjectInputStream(fis);
-				D = (DoubleMatrix2D) in.readObject();
+				D = (SparseDoubleMatrix2D) in.readObject();
 				in.close();
 				
+				// L = D - A
 				L = D.copy();
-				System.out.println("L cardinality: " + L.cardinality());
 				L.assign(A, F.minus);
 				System.out.println("L cardinality: " + L.cardinality());
-//				DoubleMatrix2D L_inv_sqrt = L.copy();
-				L.assign(F.sqrt).assign(F.inv); // L is now L^-1/2
-				L.zMult(D, L_norm);
-				L_norm.zMult(L, L_norm);
+				
+				// L_norm = D^-1/2*L*D^-1/2
+				D.assign(F.sqrt).assign(F.inv); // D is now D^-1/2
+				D.zMult(L, L_norm); // L_norm = D^-1/2 * L
+				L_norm.zMult(D, L_norm); // L_norm = L_norm * D^-1/2  
 				 
 				// Store L_norm
 				FileOutputStream fos = null;
