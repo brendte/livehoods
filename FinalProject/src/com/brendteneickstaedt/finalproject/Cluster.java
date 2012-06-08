@@ -18,6 +18,7 @@ import com.mongodb.DBObject;
 import com.mongodb.DBCursor;
 import com.mongodb.MongoException;
 
+import cern.colt.matrix.DoubleMatrix1D;
 import cern.colt.matrix.DoubleMatrix2D;
 import cern.colt.matrix.impl.SparseDoubleMatrix1D;
 import cern.colt.matrix.impl.SparseDoubleMatrix2D;
@@ -59,17 +60,23 @@ public class Cluster {
 		DBCollection venue_coll, user_coll;
 		String affinityFilename = "affinity.ser";
 		String Dfilename = "a_diagonal.ser";
+		String LnormFilename = "l_norm.ser";
 		File f = null;
 		File g = null;
+		File h = null;
 		SparseDoubleMatrix2D A = null;
 		DoubleMatrix2D D = null;
-		EigenvalueDecomposition A_eigen = null;
+		EigenvalueDecomposition L_norm_eigen = null;
 		DoubleMatrix2D L = null;
 		DoubleMatrix2D L_norm = null;
+		DoubleMatrix1D k_smallest_eigen_vals = null;
+		DoubleMatrix2D k_smallest_eigen_vecs = null;
+		DoubleMatrix2D E = null;
 		FileInputStream fis = null;
 		ObjectInputStream in = null;
 		f = new File(affinityFilename);
 		g = new File(Dfilename);
+		h = new File(LnormFilename);
 		cern.jet.math.Functions F = cern.jet.math.Functions.functions;
 		Algebra alg = new Algebra();
 		
@@ -185,7 +192,7 @@ public class Cluster {
 			} catch (ClassNotFoundException e) {
 				e.printStackTrace();
 			}
-		}  else  { //f and g exist
+		}  else if (!h.exists())  { //f and g exist
 			System.out.println("Normalizing");
 			try {
 				fis = new FileInputStream(f);
@@ -205,9 +212,47 @@ public class Cluster {
 				L.assign(F.sqrt).assign(F.inv); // L is now L^-1/2
 				L.zMult(D, L_norm);
 				L_norm.zMult(L, L_norm);
+				 
+				// Store L_norm
+				FileOutputStream fos = null;
+				ObjectOutputStream out = null;
+				fos = new FileOutputStream(h);
+				out = new ObjectOutputStream(fos);
+				out.writeObject(L_norm);
+				out.close();
 				
 				System.out.println("L_norm cardinality: " + L_norm.cardinality());
 
+			} catch (IOException e) {
+				e.printStackTrace();
+			} catch (ClassNotFoundException e) {
+				e.printStackTrace();
+			}
+		} else { //f, g and h exist
+			try {
+				fis = new FileInputStream(f);
+				in = new ObjectInputStream(fis);
+				A = (SparseDoubleMatrix2D) in.readObject();
+				in.close();
+				fis = new FileInputStream(g);
+				in = new ObjectInputStream(fis);
+				D = (DoubleMatrix2D) in.readObject();
+				in.close();
+				fis = new FileInputStream(g);
+				in = new ObjectInputStream(fis);
+				L_norm = (DoubleMatrix2D) in.readObject();
+				in.close();
+				
+				L_norm_eigen = new EigenvalueDecomposition(L_norm); 
+				k_smallest_eigen_vals = L_norm_eigen.getRealEigenvalues().viewSorted().viewPart(0, k_max - 1);
+				k_smallest_eigen_vecs = L_norm_eigen.getV().viewSorted(0).viewPart(0, 0, k_max - 1, A.viewRow(1).size() - 1);
+				E = k_smallest_eigen_vecs.viewDice().copy();
+				
+				// Cluster E using k-means. Use  weka.clusterers.SimpleKMeans
+				// Output clusters to file
+				// Read each box_id (row id in E) for each cluster, and look-up lat/lng for that box in Mongo
+				// Plot each box using lat/lng on Google maps, with each box in a cluster having the same color, and no two clusters sharing the same color
+				 
 			} catch (IOException e) {
 				e.printStackTrace();
 			} catch (ClassNotFoundException e) {
