@@ -61,9 +61,11 @@ public class Cluster {
 		String affinityFilename = "affinity.ser";
 		String Dfilename = "a_diagonal.ser";
 		String LnormFilename = "l_norm.ser";
-		File f = null;
-		File g = null;
-		File h = null;
+		String EFilename = "e.ser";
+		File f = new File(affinityFilename);
+		File g = new File(Dfilename);
+		File h = new File(LnormFilename);
+		File l = new File(EFilename);
 		SparseDoubleMatrix2D A = null;
 		DoubleMatrix2D D = null;
 		EigenvalueDecomposition L_norm_eigen = null;
@@ -74,9 +76,7 @@ public class Cluster {
 		DoubleMatrix2D E = null;
 		FileInputStream fis = null;
 		ObjectInputStream in = null;
-		f = new File(affinityFilename);
-		g = new File(Dfilename);
-		h = new File(LnormFilename);
+		
 		cern.jet.math.Functions F = cern.jet.math.Functions.functions;
 		Algebra alg = new Algebra();
 		
@@ -127,7 +127,7 @@ public class Cluster {
 					Map venueMap = venue.toMap();
 					Set<Map.Entry<String, Integer>> checkinBagMap = ((BasicDBObject) venueMap.get("check_in_bag")).toMap().entrySet();
 					for (Map.Entry<String, Integer> userCheckin : checkinBagMap) {
-						c_v.setQuick(
+						c_v.set(
 								new Integer(userCheckin.getKey()).intValue(),
 								1.0 * userCheckin.getValue().intValue());
 					}
@@ -145,7 +145,7 @@ public class Cluster {
 								c_j);
 						if (affinityScore != 0.0) {
 							affinityScore += alpha;
-							A.setQuick(i, j, affinityScore);
+							A.set(i, j, affinityScore);
 						}
 						System.out.println("done: (" + i + "," + j
 								+ "). affinity score: " + affinityScore);
@@ -175,7 +175,7 @@ public class Cluster {
 				for (int i = 0; i < A.viewRow(1).size() ; i++) {					
 					double degree = A.viewRow(i).zSum();
 					System.out.println("Row " + i + " degree: " + degree);
-					D.setQuick(i, i, degree);
+					D.set(i, i, degree);
 				}
 				
 				FileOutputStream fos = null;
@@ -237,20 +237,44 @@ public class Cluster {
 				in = new ObjectInputStream(fis);
 				D = (DoubleMatrix2D) in.readObject();
 				in.close();
-				fis = new FileInputStream(g);
+				fis = new FileInputStream(h);
 				in = new ObjectInputStream(fis);
 				L_norm = (DoubleMatrix2D) in.readObject();
 				in.close();
 				
-				L_norm_eigen = new EigenvalueDecomposition(L_norm); 
+				// Find eigenvalues and eigenvectors of L_norm
+				L_norm_eigen = new EigenvalueDecomposition(L_norm);
+				//Find k_max smallest eigenvalues of L_norm
 				k_smallest_eigen_vals = L_norm_eigen.getRealEigenvalues().viewSorted().viewPart(0, k_max - 1);
-				k_smallest_eigen_vecs = L_norm_eigen.getV().viewSorted(0).viewPart(0, 0, k_max - 1, A.viewRow(1).size() - 1);
+				//Find k, where k = arg_max(i from k_min to k_max, eig_val_i+1 - eig_val_i
+				double max = 0.0;
+				int k = 0;
+				for (int min = k_min; min < k_max; min++) {
+					if (k_smallest_eigen_vals.get(min + 1) - k_smallest_eigen_vals.get(min) > max) {
+						k = k_min;
+					}
+				}
+				//Find k smallest eigenvectors of L_norm. I'm not sure about this, as the sort requires specifying a column as the comparator column, which may not be correct in terms of the
+				//Livehoods algorithm's meaning here...
+				k_smallest_eigen_vecs = L_norm_eigen.getV().viewSorted(0).viewPart(0, 0, k - 1, A.viewRow(1).size() - 1);
+				//Take the k smallest eigenvectors of L_norm from the matrix in which they are rows, and create matrix E in which they are columns
 				E = k_smallest_eigen_vecs.viewDice().copy();
 				
-				// Cluster E using k-means. Use  weka.clusterers.SimpleKMeans
-				// Output clusters to file
-				// Read each box_id (row id in E) for each cluster, and look-up lat/lng for that box in Mongo
-				// Plot each box using lat/lng on Google maps, with each box in a cluster having the same color, and no two clusters sharing the same color
+				// Store E
+				FileOutputStream fos = null;
+				ObjectOutputStream out = null;
+				fos = new FileOutputStream(l);
+				out = new ObjectOutputStream(fos);
+				out.writeObject(L_norm);
+				out.close();
+				
+				// TODO: Cluster E using k-means. Use  weka.clusterers.SimpleKMeans
+				
+				// TODO: Output clusters to file
+				
+				// TODO: Read each box_id (row id in E) for each cluster, and look-up lat/lng for that box in Mongo
+				
+				// TODO: Plot each box using lat/lng on Google maps, with each box in a cluster having the same color, and no two clusters sharing the same color
 				 
 			} catch (IOException e) {
 				e.printStackTrace();

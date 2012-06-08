@@ -44,9 +44,11 @@ When this was completed, there were approximately 947,000 non-zero entries in th
 
 **Spectral Clustering**
 
-Using affinity matrix A, we calculate the diagonal degree matrix D of A, which is the sum of all affinity values j for row i. This is equivalent to calculating the "in weight" of all the edges into node i.  This value is stored at D(i, i), which is a sparse matrix containing only values on the diagonal. Once D is built, it is serialized and stored as a file.
+Using affinity matrix A, we calculate the diagonal degree matrix D of A, which is the sum of all affinity values j for row i. This is equivalent to calculating the "in weight" of all the edges into node i.  This value is stored at D(i, i), which is a sparse matrix containing only values on the diagonal. Once D is built, it is serialized and stored as a file. As one would expect, this calculation ran in only a few minutes.
 
-As one would expect, this calculation ran in only a few minutes.
+With D built, we then calculate L = D - A, which is then used to calculate L_norm = D^-1/2*L*D^-1/2. Once L_norm is built, it is serialized and stored as a file.
+
+With L_norm built, we can finally calculate the eigenvalues and eigenvectors, which is the whole point of all of this! I use Colt's built-in EigenvalueDecomposition class to do the eigen calculations.  To find the k_max smallest eigenvalues, I sort the eigenvalues array least to greatest, and then pull off the first k_max values.  I then find the largest delta = eigenval_i+1 - eigenval_i, where k_min <= i < k_max, and use that delta's i value as k. This k value is then used to pull off the k smallest eigenvectors of L_norm.  Finally, we take the k smallest eigenvectors of L_norm, represented as rows of a matrix, and flip the matrix so the eigenvectors are now columns of a new matrix E. Once E is built, it is serialized and stored as a file.
 
 ==What's Missing?==
 
@@ -56,6 +58,7 @@ Unfortunately, the final output. I have simply run out of time to complete the f
 2) Output the clusters decided by Weka to a file that contains an ID for each cluster, and all of the box ids (the row number for the vector representing the box in E) in that cluster.
 3) Read in this file, map each cluster ID to a distinct color (for placing on the map) and map each box id to it coordinates (as stored in MongoDB)
 4) For each box in the cluster file, map it as a polygon onto a Google Map of Philadelphia using the box's coordinates. The outline and shading color will match the color for the cluster to which the box belongs.
+5) Refactoring and cleaning up the code.  The Ruby code needs basic housekeeping, and could be a bit more modular.  The Java code needs a ton of refactoring to make it object-oriented.  Right now, it is strictly procedural.  My real preference here (and as I said I wanted to do in my progress report) would be to do all of this in Clojure using the Incanter libraries, so that it would all be functional rather than procedural/object-oriented. I just ran out of time to learn Incanter, though...
 	
 ==Lessons Learned==
 
@@ -76,6 +79,8 @@ The Livehoods paper claims that "by only connecting each venue v to its m neares
 3) What parts of my algorithms are inefficiently implemented in comparison to the Livehoods investigators that allowed them to make this claim, while my results would indicate that this method cannot be run efficiently without significant parallelization and processing horsepower?
 4) Are there better matrix and linear algebra libraries than Colt for this type of numerical processing? (Seems like Colt is highly optimized and efficient, so I'd be surprised if this were the case, at least in Java).
 5) Is there a more appropriate language to use for this? (These days, Java is so fast that I find it hard to imagine doing this in Fortran or C would yield significant performance improvements, but I could be very wrong.)
-6) How could this be converted to a parallelized algorithm (to run on a Hadoop cluster, for instance)? 
+6) How could this be converted to a parallelized algorithm (to run on a Hadoop cluster, for instance)?
+7) How could this be converted to Clojure/Incanter?
+8) How could we use Mahout for k-means rather than Weka? 
 
 
